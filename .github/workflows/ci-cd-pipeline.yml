@@ -40,7 +40,7 @@ jobs:
 
       - name: Deploy web assets to S3
         run: |
-          aws s3 sync ./web_assets s3://jeffs-weather-app --acl public-read --delete
+          aws s3 sync ./web_assets s3://jeffs-weather-app --delete
 
       - name: Ensure DynamoDB Table Exists
         run: |

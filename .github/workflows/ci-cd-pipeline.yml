@@ -1,0 +1,57 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+          sudo installer -pkg AWSCLIV2.pkg -target /
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy routeUserData Lambda
+        run: |
+          cd lambda_functions/routeUserData
+          zip -r routeUserData.zip .
+          aws lambda update-function-code --function-name routeUserData --zip-file fileb://routeUserData.zip
+
+      - name: Deploy workerService Lambda
+        run: |
+          cd lambda_functions/workerService
+          zip -r workerService.zip .
+          aws lambda update-function-code --function-name workerService --zip-file fileb://workerService.zip
+
+      - name: Deploy processWeatherData Lambda
+        run: |
+          cd lambda_functions/processWeatherData
+          zip -r processWeatherData.zip .
+          aws lambda update-function-code --function-name processWeatherData --zip-file fileb://processWeatherData.zip
+
+      - name: Deploy web assets to S3
+        run: |
+          aws s3 sync ./web_assets s3://jeffs-weather-app --delete
+
+      - name: Ensure DynamoDB Table Exists
+        run: |
+          aws dynamodb describe-table --table-name WeatherData || aws dynamodb create-table --table-name WeatherData --attribute-definitions AttributeName=id,AttributeType=S --key-schema AttributeName=id,KeyType=HASH --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
